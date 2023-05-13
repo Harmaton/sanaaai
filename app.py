@@ -5,7 +5,7 @@ import streamlit as st
 
 st.title("Image Grid Generator")
 
-model_id = "runwayml/stable-diffusion-v1-5"
+model_id = "runwayml/stable-diffusion-v1-4"
 pipeline = DiffusionPipeline.from_pretrained(model_id, torch_dtype=torch.float16)
 pipeline.scheduler = DPMSolverMultistepScheduler.from_config(pipeline.scheduler.config)
 
