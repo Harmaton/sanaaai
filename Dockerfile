@@ -1,5 +1,13 @@
 FROM python:3.8-slim
 
+# Install system packages
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY requirements.txt ./
@@ -13,6 +21,6 @@ COPY . /app
 ENV FLASK_APP = app.py
 ENV FLASK_DEBUG = production
 
-EXPOSE 8080
+EXPOSE 8501
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app"]
+CMD ["streamlit", "run", "app.py"]
