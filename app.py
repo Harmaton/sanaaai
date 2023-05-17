@@ -1,33 +1,67 @@
 import torch
-from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
+from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler
 from PIL import Image
 import streamlit as st
+from flask import Flask, request, make_response
+from flask_cors import CORS
+import os
+from io import BytesIO
 
-st.title("Image Grid Generator")
+# Use GPU 
+model_id = "CompVis/stable-diffusion-v1-4"
 
-model_id = "runwayml/stable-diffusion-v1-4"
-pipeline = DiffusionPipeline.from_pretrained(model_id, torch_dtype=torch.float16)
-pipeline.scheduler = DPMSolverMultistepScheduler.from_config(pipeline.scheduler.config)
+app = Flask(__name__)
+CORS(app)
 
-def get_inputs(prompts, batch_size=1):
-    generator = [torch.Generator("cuda").manual_seed(i) for i in range(batch_size)]
-    num_inference_steps = 20
+def image_grid(imgs, rows, cols):
+    assert len(imgs) == rows * cols
 
-    return {"prompt": prompts, "generator": generator, "num_inference_steps": num_inference_steps}
-
-def image_grid(imgs, rows=2, cols=2):
     w, h = imgs[0].size
-    grid = Image.new("RGB", size=(cols * w, rows * h))
+    grid = Image.new('RGB', size=(cols * w, rows * h))
+    grid_w, grid_h = grid.size
 
     for i, img in enumerate(imgs):
         grid.paste(img, box=(i % cols * w, i // cols * h))
     return grid
 
-prompts_input = st.text_area("Enter image prompts (one per line):", height=200)
-prompts = prompts_input.split("\n")
 
-if st.button("Generate Images"):
-    generator = [torch.Generator("cuda").manual_seed(i) for i in range(len(prompts))]
-    images = pipeline(**get_inputs(prompts, batch_size=len(prompts))).images
-    grid = image_grid(images)
-    st.image(grid, use_column_width=True)
+@app.route('/')
+def home():
+    mg = "success !"
+    return mg
+
+
+@app.route('api/generate', methods=['GET', 'POST'])
+def generate():
+    num_cols = 4
+    num_rows = 4
+    if request.method == 'POST':
+        # Get the prompt from the request
+        prompt = request.form.get('prompt') 
+        # Assuming the prompt is submitted as a form field named 'prompt'
+        print(f'Generating Image ... Hang on ...')
+        pipe = StableDiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v1-4", torch_dtype=torch.float16)
+        pipe = pipe.to("cuda") if torch.cuda.is_available() else pipe
+    
+        all_images = []
+        for i in range(num_rows):
+            images = pipe(prompt).images
+            all_images.extend(images)
+
+        grid = image_grid(all_images, rows=num_rows, cols=num_cols)
+        
+        # Convert the image to PNG format and then to a byte stream
+        byte_io = BytesIO()
+        grid.save(byte_io, 'PNG')
+        byte_io.seek(0)
+        
+        # Create a response with the byte stream as the body, and the appropriate headers
+        response = make_response(byte_io.read())
+        response.headers.set('Content-Type', 'image/png')
+        response.headers.set('Content-Disposition', 'attachment', filename='image.png')
+
+        return response
+
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8080)

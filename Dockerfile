@@ -1,16 +1,11 @@
-FROM python:3.8-slim
-
-# Install system packages
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    curl \
-    git \
-    wget \
-    && rm -rf /var/lib/apt/lists/*
+# Use an official Python runtime as a parent image
+FROM python:3.9-slim-buster
 
 WORKDIR /app
 
-COPY requirements.txt ./
+# Copy the current directory contents into the container at /app
+COPY . /app
+
 
 # Install any needed packages specified in requirements.txt
 RUN pip install --trusted-host pypi.python.org -r requirements.txt
@@ -21,6 +16,8 @@ COPY . /app
 ENV FLASK_APP = app.py
 ENV FLASK_DEBUG = production
 
-EXPOSE 8501
+# Expose port 8080 for gunicorn
+EXPOSE 8080
 
-CMD ["streamlit", "run", "app.py"]
+# Run the command to start the gunicorn server
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:8080", "app:app"]
